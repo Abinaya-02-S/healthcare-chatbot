@@ -431,13 +431,13 @@ async function getFinalResult() {
             <div class="result-card">
                 <h3>🩺 ${data.disease}</h3>
                 <div class="conf">Confidence: ${data.confidence}%</div>
-                <div class="result-row"><span>👨‍⚕️</span><span>Recommended: <strong>${data.doctor}</strong></span></div>
+                <div class="result-row"><span>👨‍⚕️</span><span>Recommended: <strong>${data.doctor}</strong><br>${data.doctor_phone}</span></div>
                 <div class="result-row"><span>📖</span><span>${data.description}</span></div>
                 <div class="prec-list">
                     <h4>🛡️ Precautions:</h4>
                     <ol>${precHTML}</ol>
                 </div>
-                <div class="result-row" style="margin-top:12px"><span>📱</span><span>eSanjeevani · Apollo 24x7 · 🚑 108</span></div>
+                <div class="result-row" style="margin-top:12px"><span>📱</span><span>${data.telemedicine.join("<br>")}</span></div>
             </div>`;
 
         const messages = document.getElementById('messages');

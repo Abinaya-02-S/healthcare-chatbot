@@ -115,6 +115,7 @@ def predict_disease(symptoms_list):
     confidence = round(pred_proba[pred_class] * 100, 2)
     return disease, confidence
 
+# ------------------ Doctor Dictionary ------------------
 disease_doctor = {
     "Fungal infection": "Dermatologist",
     "Allergy": "General Physician",
@@ -123,15 +124,60 @@ disease_doctor = {
     "Drug Reaction": "Dermatologist",
     "Peptic ulcer disease": "Gastroenterologist",
     "Diabetes": "Endocrinologist",
-    "Hypertension": "Cardiologist",
+    "Gastroenteritis": "Gastroenterologist",
     "Bronchial Asthma": "Pulmonologist",
-    "Pneumonia": "Pulmonologist",
-    "Heart attack": "Cardiologist",
+    "Hypertension": "Cardiologist",
     "Migraine": "Neurologist",
-    "Dengue": "General Physician",
+    "Cervical spondylosis": "Orthopedist",
+    "Paralysis (brain hemorrhage)": "Neurologist",
+    "Jaundice": "Gastroenterologist",
     "Malaria": "General Physician",
-    "Typhoid": "General Physician"
+    "Chicken pox": "Dermatologist",
+    "Dengue": "General Physician",
+    "Typhoid": "General Physician",
+    "hepatitis A": "Gastroenterologist",
+    "Hepatitis B": "Gastroenterologist",
+    "Hepatitis C": "Gastroenterologist",
+    "Hepatitis D": "Gastroenterologist",
+    "Hepatitis E": "Gastroenterologist",
+    "Alcoholic hepatitis": "Gastroenterologist",
+    "Tuberculosis": "Pulmonologist",
+    "Common Cold": "General Physician",
+    "Pneumonia": "Pulmonologist",
+    "Dimorphic hemmorhoids(piles)": "Gastroenterologist",
+    "Heart attack": "Cardiologist",
+    "Varicose veins": "Vascular Surgeon",
+    "Hypothyroidism": "Endocrinologist",
+    "Hyperthyroidism": "Endocrinologist",
+    "Hypoglycemia": "Endocrinologist",
+    "Osteoarthritis": "Orthopedist",
+    "Arthritis": "Orthopedist",
+    "(Vertigo) Paroxysmal Positional Vertigo": "ENT Specialist",
+    "Acne": "Dermatologist",
+    "Urinary tract infection": "Urologist",
+    "Psoriasis": "Dermatologist",
+    "Impetigo": "Dermatologist"
 }
+
+doctor_contact = {
+    "General Physician": "📞 +91 98765 43210",
+    "Cardiologist": "📞 +91 91234 56789",
+    "Dermatologist": "📞 +91 99887 76655",
+    "Pulmonologist": "📞 +91 90909 80808",
+    "Neurologist": "📞 +91 90000 11111",
+    "Gastroenterologist": "📞 +91 95555 22222",
+    "Endocrinologist": "📞 +91 93333 44444",
+    "Orthopedist": "📞 +91 92222 55555",
+    "Urologist": "📞 +91 91111 66666",
+    "ENT Specialist": "📞 +91 94444 77777",
+    "Vascular Surgeon": "📞 +91 96666 88888"
+}
+
+telemedicine_services = [
+    "Government Telemedicine: eSanjeevani – https://esanjeevani.mohfw.gov.in",
+    "Private Telemedicine: Apollo 24x7 / Practo",
+    "Emergency Ambulance: 108"
+]
 
 # ------------------ Routes ------------------
 @app.route('/')
@@ -147,10 +193,8 @@ def get_followup():
     if not detected:
         return jsonify({"error": "No symptoms detected. Please describe more clearly."})
 
-    # Get initial disease prediction
     disease, _ = predict_disease(detected)
 
-    # Get follow-up symptoms from that disease
     disease_rows = training[training['prognosis'] == disease]
     if not disease_rows.empty:
         disease_syms = list(disease_rows.iloc[0][:-1].index[
@@ -178,6 +222,7 @@ def predict():
 
     disease, confidence = predict_disease(symptom_list)
     doctor = disease_doctor.get(disease, "General Physician")
+    doctor_phone = doctor_contact.get(doctor, "📞 +91 98765 43210")
     description = description_list.get(disease, 'No description available.')
     precautions = precautionDictionary.get(disease, [])
 
@@ -190,8 +235,10 @@ def predict():
         "disease": disease,
         "confidence": confidence,
         "doctor": doctor,
+        "doctor_phone": doctor_phone,
         "description": description,
-        "precautions": precautions
+        "precautions": precautions,
+        "telemedicine": telemedicine_services
     })
 
 if __name__ == '__main__':
