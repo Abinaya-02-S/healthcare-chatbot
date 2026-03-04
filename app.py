@@ -194,7 +194,7 @@ def get_followup():
         return jsonify({"error": "No symptoms detected. Please describe more clearly."})
 
     disease, _ = predict_disease(detected)
-
+    
     disease_rows = training[training['prognosis'] == disease]
     if not disease_rows.empty:
         disease_syms = list(disease_rows.iloc[0][:-1].index[
