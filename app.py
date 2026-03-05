@@ -9,11 +9,26 @@ from sklearn.model_selection import train_test_split
 from difflib import get_close_matches
 import warnings
 warnings.filterwarnings("ignore")
-
 import os
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 app = Flask(__name__)
+
+# ------------------ Google Sheets Setup ------------------
+SHEET_ID = "1VcCEX9Qfyj3krGh7JSiqM0lkHbE9sE-RiYufm7rF00s"
+
+def save_to_sheet(name, age, gender, symptoms, disease, confidence):
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+        client = gspread.authorize(creds)
+        sheet = client.open_by_key(SHEET_ID).sheet1
+        sheet.append_row([name, age, gender, str(symptoms), disease, confidence])
+    except Exception as e:
+        print(f"Google Sheets error: {e}")
 
 # ------------------ Load Data ------------------
 training = pd.read_csv('Data/Training.csv')
@@ -194,7 +209,7 @@ def get_followup():
         return jsonify({"error": "No symptoms detected. Please describe more clearly."})
 
     disease, _ = predict_disease(detected)
-    
+
     disease_rows = training[training['prognosis'] == disease]
     if not disease_rows.empty:
         disease_syms = list(disease_rows.iloc[0][:-1].index[
@@ -226,9 +241,8 @@ def predict():
     description = description_list.get(disease, 'No description available.')
     precautions = precautionDictionary.get(disease, [])
 
-    with open("patient_logs.csv", "a", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([name, age, gender, symptom_list, disease, confidence])
+    # Save to Google Sheets
+    save_to_sheet(name, age, gender, symptom_list, disease, confidence)
 
     return jsonify({
         "name": name,
