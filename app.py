@@ -44,6 +44,10 @@ testing.columns = testing.columns.str.replace(r"\.\d+$", "", regex=True)
 training = training.loc[:, ~training.columns.duplicated()]
 testing = testing.loc[:, ~testing.columns.duplicated()]
 
+# Fix disease name spaces
+training['prognosis'] = training['prognosis'].str.strip()
+testing['prognosis'] = testing['prognosis'].str.strip()
+
 cols = training.columns[:-1]
 x = training[cols]
 y = training['prognosis']
@@ -58,17 +62,17 @@ model.fit(x_train, y_train)
 
 symptoms_dict = {symptom: idx for idx, symptom in enumerate(x)}
 
-# Build disease -> unique symptoms map from training data
+# Build disease symptom map
 disease_symptom_map = {}
 original_y = training['prognosis']
 for disease in original_y.unique():
     rows = training[original_y == disease]
     sym_cols = rows.columns[:-1]
-    # Get symptoms that appear in MORE than 50% of rows for this disease
     freq = rows[sym_cols].mean()
     top_syms = freq[freq > 0.3].sort_values(ascending=False).index.tolist()
     disease_symptom_map[disease] = top_syms
 
+# ------------------ Dictionaries ------------------
 severityDictionary = {}
 description_list = {}
 precautionDictionary = {}
@@ -77,28 +81,29 @@ def loadData():
     with open('MasterData/symptom_Description.csv') as f:
         for row in csv.reader(f):
             if len(row) >= 2:
-                description_list[row[0]] = row[1]
+                description_list[row[0].strip()] = row[1]
     try:
         with open('MasterData/Symptom_severity.csv') as f:
             for row in csv.reader(f):
                 try:
-                    severityDictionary[row[0]] = int(row[1])
+                    severityDictionary[row[0].strip()] = int(row[1])
                 except:
                     pass
     except:
         with open('MasterData/symptom_severity.csv') as f:
             for row in csv.reader(f):
                 try:
-                    severityDictionary[row[0]] = int(row[1])
+                    severityDictionary[row[0].strip()] = int(row[1])
                 except:
                     pass
     with open('MasterData/symptom_precaution.csv') as f:
         for row in csv.reader(f):
             if len(row) >= 5:
-                precautionDictionary[row[0]] = [row[1], row[2], row[3], row[4]]
+                precautionDictionary[row[0].strip()] = [row[1], row[2], row[3], row[4]]
 
 loadData()
 
+# ------------------ Symptom Extractor ------------------
 symptom_synonyms = {
     "stomach ache": "stomach_pain",
     "belly pain": "stomach_pain",
@@ -156,20 +161,18 @@ def predict_disease(symptoms_list):
     return disease, confidence
 
 def get_smart_followup(detected_symptoms, disease):
-    """Get follow-up questions specific to the predicted disease"""
     disease_syms = disease_symptom_map.get(disease, [])
-    # Only ask about symptoms NOT already detected
     followup = [s for s in disease_syms if s not in detected_symptoms]
-    # Limit to 6 questions
     return followup[:6]
 
+# ------------------ Doctor Dictionary ------------------
 disease_doctor = {
     "Fungal infection": "Dermatologist",
     "Allergy": "General Physician",
     "GERD": "Gastroenterologist",
     "Chronic cholestasis": "Gastroenterologist",
     "Drug Reaction": "Dermatologist",
-    "Peptic ulcer disease": "Gastroenterologist",
+    "Peptic ulcer diseae": "Gastroenterologist",
     "Diabetes": "Endocrinologist",
     "Gastroenteritis": "Gastroenterologist",
     "Bronchial Asthma": "Pulmonologist",
@@ -191,19 +194,20 @@ disease_doctor = {
     "Tuberculosis": "Pulmonologist",
     "Common Cold": "General Physician",
     "Pneumonia": "Pulmonologist",
-    "Dimorphic hemmorhoids(piles)": "Gastroenterologist",
+    "Dimorphic hemorrhoids(piles)": "Gastroenterologist",
     "Heart attack": "Cardiologist",
     "Varicose veins": "Vascular Surgeon",
     "Hypothyroidism": "Endocrinologist",
     "Hyperthyroidism": "Endocrinologist",
     "Hypoglycemia": "Endocrinologist",
-    "Osteoarthritis": "Orthopedist",
+    "Osteoarthristis": "Orthopedist",
     "Arthritis": "Orthopedist",
-    "(Vertigo) Paroxysmal Positional Vertigo": "ENT Specialist",
+    "(vertigo) Paroymsal  Positional Vertigo": "ENT Specialist",
     "Acne": "Dermatologist",
     "Urinary tract infection": "Urologist",
     "Psoriasis": "Dermatologist",
-    "Impetigo": "Dermatologist"
+    "Impetigo": "Dermatologist",
+    "AIDS": "General Physician"
 }
 
 doctor_contact = {
@@ -237,11 +241,9 @@ def get_followup():
     detected = extract_symptoms(symptoms_input, cols)
 
     if not detected:
-        return jsonify({"error": "No symptoms detected. Please describe your symptoms more clearly. Example: I have fever and headache"})
+        return jsonify({"error": "No symptoms detected. Please describe your symptoms clearly. Example: I have fever and headache"})
 
     disease, confidence = predict_disease(detected)
-
-    # Get smart disease-specific follow-up questions
     followup = get_smart_followup(detected, disease)
 
     return jsonify({
