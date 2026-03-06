@@ -18,19 +18,16 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 app = Flask(__name__)
 
-# ------------------ Google Sheets Setup ------------------
 SHEET_ID = "1VcCEX9Qfyj3krGh7JSiqM0lkHbE9sE-RiYufm7rF00s"
 
 def save_to_sheet(name, age, gender, symptoms, disease, confidence):
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        # Try environment variable first (for Render)
         creds_json = os.environ.get("GOOGLE_CREDENTIALS")
         if creds_json:
             creds_dict = json.loads(creds_json)
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         else:
-            # Use local file (for PC)
             creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_key(SHEET_ID).sheet1
@@ -61,7 +58,17 @@ model.fit(x_train, y_train)
 
 symptoms_dict = {symptom: idx for idx, symptom in enumerate(x)}
 
-# ------------------ Dictionaries ------------------
+# Build disease -> unique symptoms map from training data
+disease_symptom_map = {}
+original_y = training['prognosis']
+for disease in original_y.unique():
+    rows = training[original_y == disease]
+    sym_cols = rows.columns[:-1]
+    # Get symptoms that appear in MORE than 50% of rows for this disease
+    freq = rows[sym_cols].mean()
+    top_syms = freq[freq > 0.3].sort_values(ascending=False).index.tolist()
+    disease_symptom_map[disease] = top_syms
+
 severityDictionary = {}
 description_list = {}
 precautionDictionary = {}
@@ -92,7 +99,6 @@ def loadData():
 
 loadData()
 
-# ------------------ Symptom Extractor ------------------
 symptom_synonyms = {
     "stomach ache": "stomach_pain",
     "belly pain": "stomach_pain",
@@ -107,6 +113,17 @@ symptom_synonyms = {
     "breathing issue": "breathlessness",
     "shortness of breath": "breathlessness",
     "body ache": "muscle_pain",
+    "headache": "headache",
+    "vomiting": "vomiting",
+    "nausea": "nausea",
+    "fatigue": "fatigue",
+    "weakness": "fatigue",
+    "itching": "itching",
+    "rash": "skin_rash",
+    "chest pain": "chest_pain",
+    "back pain": "back_pain",
+    "joint pain": "joint_pain",
+    "dizziness": "dizziness",
 }
 
 def extract_symptoms(user_input, all_symptoms):
@@ -138,7 +155,14 @@ def predict_disease(symptoms_list):
     confidence = round(pred_proba[pred_class] * 100, 2)
     return disease, confidence
 
-# ------------------ Doctor Dictionary ------------------
+def get_smart_followup(detected_symptoms, disease):
+    """Get follow-up questions specific to the predicted disease"""
+    disease_syms = disease_symptom_map.get(disease, [])
+    # Only ask about symptoms NOT already detected
+    followup = [s for s in disease_syms if s not in detected_symptoms]
+    # Limit to 6 questions
+    return followup[:6]
+
 disease_doctor = {
     "Fungal infection": "Dermatologist",
     "Allergy": "General Physician",
@@ -202,7 +226,6 @@ telemedicine_services = [
     "Emergency Ambulance: 108"
 ]
 
-# ------------------ Routes ------------------
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -214,22 +237,17 @@ def get_followup():
     detected = extract_symptoms(symptoms_input, cols)
 
     if not detected:
-        return jsonify({"error": "No symptoms detected. Please describe more clearly."})
+        return jsonify({"error": "No symptoms detected. Please describe your symptoms more clearly. Example: I have fever and headache"})
 
-    disease, _ = predict_disease(detected)
+    disease, confidence = predict_disease(detected)
 
-    disease_rows = training[training['prognosis'] == disease]
-    if not disease_rows.empty:
-        disease_syms = list(disease_rows.iloc[0][:-1].index[
-            disease_rows.iloc[0][:-1] == 1
-        ])
-        followup = [s for s in disease_syms if s not in detected][:6]
-    else:
-        followup = []
+    # Get smart disease-specific follow-up questions
+    followup = get_smart_followup(detected, disease)
 
     return jsonify({
         "detected_symptoms": detected,
-        "followup_symptoms": followup
+        "followup_symptoms": followup,
+        "initial_disease": disease
     })
 
 @app.route('/predict', methods=['POST'])
@@ -249,7 +267,6 @@ def predict():
     description = description_list.get(disease, 'No description available.')
     precautions = precautionDictionary.get(disease, [])
 
-    # Save to Google Sheets
     save_to_sheet(name, age, gender, symptom_list, disease, confidence)
 
     return jsonify({
