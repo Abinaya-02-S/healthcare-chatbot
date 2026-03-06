@@ -3,13 +3,14 @@ import pandas as pd
 import numpy as np
 import csv
 import re
+import os
+import json
 from sklearn import preprocessing
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from difflib import get_close_matches
 import warnings
 warnings.filterwarnings("ignore")
-import os
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -23,10 +24,17 @@ SHEET_ID = "1VcCEX9Qfyj3krGh7JSiqM0lkHbE9sE-RiYufm7rF00s"
 def save_to_sheet(name, age, gender, symptoms, disease, confidence):
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+        # Try environment variable first (for Render)
+        creds_json = os.environ.get("GOOGLE_CREDENTIALS")
+        if creds_json:
+            creds_dict = json.loads(creds_json)
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        else:
+            # Use local file (for PC)
+            creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_key(SHEET_ID).sheet1
-        sheet.append_row([name, age, gender, str(symptoms), disease, confidence])
+        sheet.append_row([name, age, gender, str(symptoms), disease, str(confidence)])
     except Exception as e:
         print(f"Google Sheets error: {e}")
 
